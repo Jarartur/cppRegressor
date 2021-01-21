@@ -1,6 +1,9 @@
 # cppRegressor
 app build in C++ with Qt to visualize quantifiable tabular data
 
+# Instalation
+Go to [releases](https://github.com/Jarartur/cppRegressor/releases) and choose most up to date version. Download and unzip the folder then launch the .exe file.
+
 # How to build
   - Import project to Qt creator
   - change INCLUDEPATH += $path to eigen library in Regressor3000.pro
