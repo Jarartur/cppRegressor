@@ -181,6 +181,11 @@ void MainWindow::on_actionPlot_current_data_triggered()
         return;
     }
 
+    if (file.size()==0) {
+        QMessageBox::warning(this, "Warning", "Cannot plot empty file");
+        return;
+    }
+
     setWindowTitle(fileName);
     QTextStream out(&file);
     QString text = ui->textEdit->toPlainText();
