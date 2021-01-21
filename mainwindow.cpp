@@ -187,7 +187,6 @@ void MainWindow::on_actionPlot_current_data_triggered()
     out << text;
     file.close();
 
-    //##################################################################
     MatrixXd matrix;// matrix to be loaded from a file
     vector<double> matrixEntries;// load the matrix from the file
     ifstream matrixDataFile(currentFile.toStdString());// in this object we store the data from the matrix
@@ -195,26 +194,43 @@ void MainWindow::on_actionPlot_current_data_triggered()
     string matrixEntry;// this variable is used to store the matrix entry;
     int matrixRowNumber = 0;// this variable is used to track the number of rows
 
-    while (getline(matrixDataFile, matrixRowString)) // here we read a row by row of matrixDataFile and store every line into the string variable matrixRowString
-    {
-        stringstream matrixRowStringStream(matrixRowString); //convert matrixRowString that is a string to a stream variable.
-
-        while (getline(matrixRowStringStream, matrixEntry, ',')) // here we read pieces of the stream matrixRowStringStream until every comma, and store the resulting character into the matrixEntry
+    //##################################################################
+    try {
+        while (getline(matrixDataFile, matrixRowString)) // here we read a row by row of matrixDataFile and store every line into the string variable matrixRowString
         {
-            matrixEntries.push_back(stod(matrixEntry));   //here we convert the string to double and fill in the row vector storing all the matrix entries
-        }
-        matrixRowNumber++; //update the column numbers
-    }
+            stringstream matrixRowStringStream(matrixRowString); //convert matrixRowString that is a string to a stream variable.
 
-    matrix = Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(matrixEntries.data(), matrixRowNumber, matrixEntries.size() / matrixRowNumber);
+            while (getline(matrixRowStringStream, matrixEntry, ',')) // here we read pieces of the stream matrixRowStringStream until every comma, and store the resulting character into the matrixEntry
+            {
+                matrixEntries.push_back(stod(matrixEntry));   //here we convert the string to double and fill in the row vector storing all the matrix entries
+            }
+            matrixRowNumber++; //update the column numbers
+        }
+
+        matrix = Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(matrixEntries.data(), matrixRowNumber, matrixEntries.size() / matrixRowNumber);
+
+    } catch (const std::invalid_argument e) {
+        QMessageBox::warning(this, "Warning", "Cannot plot file, try editing it in Editor tab for compatible format");
+        return;
+    }
 
     //##################################################################
     int xColumn = ui->xAxis->value();
     int yColumn = ui->yAxis->value();
     VectorXd xValues, yValues;
+    int columns = int(matrixEntries.size() / matrixRowNumber);
 
-    xValues = matrix.col(xColumn);
-    yValues = matrix.col(yColumn);
+    try {
+        if(xColumn < columns && yColumn < columns) {
+            xValues = matrix.col(xColumn);
+            yValues = matrix.col(yColumn);
+        } else {
+            throw string("Matrix out of bonds");
+        }
+    } catch (string &e) {
+        QMessageBox::warning(this, "Warning", "Chosen column is out of bonds for the current data");
+        return;
+    }
 
     // convert the Eigen objects into the std::vector form
     // .data() returns the pointer to the first memory location of the first entry of the stored object
@@ -234,8 +250,7 @@ void MainWindow::on_actionPlot_current_data_triggered()
     double y_maxValue=yValues.maxCoeff();
     double y_minValue=yValues.minCoeff();
 
-
-    QCustomPlot *customPlot=ui->widgetGraph;
+    customPlot=ui->widgetGraph;
     // create graph and assign data to it:
     customPlot->addGraph();
     customPlot->addGraph();
@@ -303,10 +318,8 @@ void MainWindow::on_actionPlot_current_data_triggered()
             elem = a*xn[i]+b;
             i++;
         }
-        /*
-        for (i=0;i<n;i++){
-            y_fit[i]=a*xn[i]+b;                  //to calculate y(fitted) at given x points
-        }*/
+
+        reg_fit_calc = true;
 
         QVector<double> xnw = QVector<double>::fromStdVector(xn);
         QVector<double> ynw = QVector<double>::fromStdVector(y_fit);
@@ -349,21 +362,27 @@ void MainWindow::on_actionPlot_current_data_triggered()
     customPlot->yAxis->setRange(y_minValue-0.1*abs(y_minValue), y_maxValue+0.1*abs(y_maxValue));
     // set legend
     if(ui->checkBox_legend->isChecked()){
-        char buffer[100];
-        string s = ui->lineEdit_xaxis->text().toStdString();
-        char c[s.size() + 1];
-        strcpy(c, s.c_str());
+        if(reg_fit_calc==true) {
+            char buffer[100];
+            string s = ui->lineEdit_xaxis->text().toStdString();
+            char c[s.size() + 1];
+            strcpy(c, s.c_str());
 
-        string s2 = ui->lineEdit_yaxis->text().toStdString();
-        char c2[s2.size() + 1];
-        strcpy(c2, s2.c_str());
+            string s2 = ui->lineEdit_yaxis->text().toStdString();
+            char c2[s2.size() + 1];
+            strcpy(c2, s2.c_str());
 
-        std::snprintf(buffer, sizeof(buffer), "%s = %.3f * %s + (%.3f)", c2, a, c, b);
-        customPlot->xAxis2->setLabel(buffer);
+            std::snprintf(buffer, sizeof(buffer), "%s = %.3f * %s + (%.3f)", c2, a, c, b);
+            customPlot->xAxis2->setLabel(buffer);
+        } else {
+            QMessageBox::warning(this, "Warning", "Cannot set regression equation as title without enabling regression fit");
+        }
     }
 
     customPlot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
     customPlot->replot();
+    first_plot = true;
+    reg_fit_calc = false;
 }
 
 void MainWindow::on_pushButton_clicked()
@@ -382,3 +401,23 @@ void MainWindow::on_pushButton_2_clicked()
     }
 }
 
+
+void MainWindow::on_actionSave_current_plot_to_file_triggered()
+{
+    // Opens a dialog for saving a file
+    QString fileName = QFileDialog::getSaveFileName(this, "Save as");
+
+    QFile file(fileName);
+
+    if (!file.open(QFile::WriteOnly)) {
+        QMessageBox::warning(this, "Warning", "Cannot save plot: " + file.errorString());
+        return;
+    } else {
+        if(first_plot==false) {
+            QMessageBox::warning(this, "Warning", "Cannot save empty plot");
+            return;
+        } else {
+            customPlot->savePng(fileName);
+        }
+    }
+}

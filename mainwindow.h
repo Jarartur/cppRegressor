@@ -13,6 +13,8 @@
 #include <QColorDialog>
 #include <QColor>
 
+#include "qcustomplot.h"
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -52,11 +54,16 @@ private slots:
 
     void on_pushButton_2_clicked();
 
+    void on_actionSave_current_plot_to_file_triggered();
+
 private:
     Ui::MainWindow *ui;
     QString currentFile = "";
     QColor datacolor = Qt::blue;
     QColor regcolor = Qt::red;
+    QCustomPlot *customPlot;
+    bool first_plot = false;
+    bool reg_fit_calc = false;
 
 };
 #endif // MAINWINDOW_H
